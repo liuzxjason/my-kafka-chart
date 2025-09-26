@@ -10,7 +10,7 @@ replication:
 
 image:
   repository: apache/kafka
-  tag: "3.9.0"
+  tag: "3.8.0"
   pullPolicy: IfNotPresent
 
 clusterDomain: cluster.local

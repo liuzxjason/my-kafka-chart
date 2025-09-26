@@ -31,8 +31,9 @@ data:
     listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
     
     # Advertised listeners - CONTROLLER needed for KRaft mode
-    advertised.listeners=PLAINTEXT://${POD_NAME}.{{ $headlessService }}:{{ $brokerPort }},CONTROLLER://${POD_NAME}.{{ $headlessService }}:{{ $controllerPort }},EXTERNAL://${NODE_IP}:{{ $nodePort }}
-    
+    #advertised.listeners=PLAINTEXT://${POD_NAME}.{{ $headlessService }}:{{ $brokerPort }},CONTROLLER://${POD_NAME}.{{ $headlessService }}:{{ $controllerPort }},EXTERNAL://${NODE_IP}:{{ $nodePort }}
+    advertised.listeners=PLAINTEXT://${POD_NAME}.{{ $headlessService }}:{{ $brokerPort }},EXTERNAL://${NODE_IP}:{{ $nodePort }}
+
     controller.listener.names=CONTROLLER
     inter.broker.listener.name=PLAINTEXT
 
@@ -57,4 +58,6 @@ data:
     
     ########################## Cluster settings
     cluster.id={{ .Values.clusterId }}
-
+    
+    inter.broker.protocol.version=3.8-IV0
+    log.message.format.version=3.8-IV0
