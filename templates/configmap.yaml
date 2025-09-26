@@ -24,7 +24,17 @@ data:
     ########################## KRaft mode configuration
     process.roles=broker,controller
     node.id=${NODE_ID}
-    controller.quorum.voters={{ range $i, $_ := until $replicas }}{{- if gt $i 0 }},{{- end }}{{ $i }}@{{ $fullname }}-{{ $i }}.{{ $headlessService }}:{{ $controllerPort }}{{- end }}
+    #controller.quorum.voters={{ range $i, $_ := until $replicas }}{{- if gt $i 0 }},{{- end }}{{ $i }}@{{ $fullname }}-{{ $i }}.{{ $headlessService }}:{{ $controllerPort }}{{- end }}
+    controller.quorum.voters: |
+      {{- range $i, $_ := until $replicas }}
+      {{- if gt $i 0 }},{{- end }}
+      {{ $i }}@{{ $fullname }}-{{ $i }}.{{ $headlessService }}:{{ $controllerPort }}
+    {{- end }}
+
+    #controller.quorum.voters={{ range $i, $_ := until $replicas }}
+    #  {{- if gt $i 0 }},{{- end }}
+    #  {{ $i }}@{{ $fullname }}-{{ $i }}.{{ $headlessService }}:{{ $controllerPort }}
+    #{{- end }}
     ########################## Network listeners
     listeners=PLAINTEXT://0.0.0.0:{{ $brokerPort }},CONTROLLER://0.0.0.0:{{ $controllerPort }},EXTERNAL://0.0.0.0:{{ $externalPort }}
     listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
