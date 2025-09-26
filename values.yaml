@@ -1,0 +1,77 @@
+namespace:
+  create: false          # helm install -n <ns> --create-namespace (recommended). Set true to template a Namespace.
+  name: kafka-kraft
+
+replicaCount: 3
+
+replication:
+  factor: 2
+  minInSyncReplicas: 1 
+
+image:
+  repository: apache/kafka
+  tag: "3.9.0"
+  pullPolicy: IfNotPresent
+
+clusterDomain: cluster.local
+
+# Listener ports
+ports:
+  broker: 9092
+  controller: 9093
+  external: 9094
+
+externalService:
+  enabled: true
+  type: NodePort
+  nodePort: 30094
+  externalTrafficPolicy: Local
+
+# KRaft cluster UUID (must stay stable across restarts)
+clusterId: "234b310d-3eca-4d2f-854b-a57cdb64c7fb"
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: local-path
+  accessModes: ["ReadWriteOnce"]
+
+probes:
+  readiness:
+    tcpSocketPort: 9092
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+  liveness:
+    tcpSocketPort: 9092
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+podManagementPolicy: Parallel
+
+# Spread pods across nodes (important for NodePort-per-node EXTERNAL access)
+affinity:
+  podAntiAffinity:
+    required: true   # set to false to make it preferred instead of required
+
+nodeSelector: {}
+tolerations: []
+
+# Names
+nameOverride: "kafka"
+fullnameOverride: "kafka"
+labels:
+  app: kafka
+  purpose: kafka-deployment
+

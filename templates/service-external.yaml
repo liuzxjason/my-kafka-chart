@@ -1,0 +1,21 @@
+{{- if .Values.externalService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kafka-kraft.fullname" . }}-external
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "kafka-kraft.labels" . | nindent 4 }}
+    service-type: external
+spec:
+  type: {{ .Values.externalService.type }}
+  externalTrafficPolicy: {{ .Values.externalService.externalTrafficPolicy }}
+  selector:
+    app: {{ .Values.labels.app }}
+  ports:
+    - name: external
+      port: {{ .Values.ports.external }}
+      targetPort: {{ .Values.ports.external }}
+      nodePort: {{ .Values.externalService.nodePort }}
+      protocol: TCP
+{{- end }}

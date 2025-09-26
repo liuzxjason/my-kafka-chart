@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kafka-kraft
+description: Apache Kafka in KRaft mode (3-broker) with NodePort external access
+type: application
+version: 0.1.0
+appVersion: "3.9.0"

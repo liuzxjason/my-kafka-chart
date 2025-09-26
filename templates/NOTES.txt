@@ -1,0 +1,13 @@
+Thanks for installing kafka-kraft!
+
+Namespace: {{ .Values.namespace.name }}
+Release:   {{ .Release.Name }}
+
+Endpoints:
+- Inside cluster: PLAINTEXT at {{ include "kafka-kraft.fullname" . }}-headless.{{ .Values.namespace.name }}.svc.{{ .Values.clusterDomain }}:{{ .Values.ports.broker }}
+- Controller:     {{ include "kafka-kraft.fullname" . }}-headless.{{ .Values.namespace.name }}.svc.{{ .Values.clusterDomain }}:{{ .Values.ports.controller }}
+- External (NodePort on each node): nodeIP:{{ .Values.externalService.nodePort }}
+
+IMPORTANT:
+- externalTrafficPolicy=Local expects one Kafka pod per node; the chart enforces anti-affinity to help this.
+- Clients outside Kubernetes must connect to the specific nodeIP matching the broker they target as advertised by EXTERNAL.

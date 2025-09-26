@@ -1,0 +1,59 @@
+{{- /* Helper variables for cleaner template */ -}}
+{{- $replicas := int .Values.replicaCount -}}
+{{- $fullname := include "kafka-kraft.fullname" . -}}
+{{- $namespace := .Release.Namespace -}}
+{{- $headlessService := printf "%s-headless.%s.svc.cluster.local" $fullname $namespace -}}
+{{- $controllerPort := .Values.ports.controller -}}
+{{- $brokerPort := .Values.ports.broker -}}
+{{- $externalPort := .Values.ports.external -}}
+{{- /* Get nodePort from your actual values structure */ -}}
+{{- $nodePort := .Values.externalService.nodePort | default $externalPort -}}
+{{- /* Smart defaults for replication */ -}}
+{{- $defaultReplicationFactor := min 3 $replicas -}}
+{{- $defaultMinISR := max 1 (sub $defaultReplicationFactor 1) -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kafka-kraft.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafka-kraft.labels" . | nindent 4 }}
+data:
+  server.properties: |
+    ########################## KRaft mode configuration
+    process.roles=broker,controller
+    node.id=${NODE_ID}
+    controller.quorum.voters={{ range $i, $_ := until $replicas }}{{- if gt $i 0 }},{{- end }}{{ $i }}@{{ $fullname }}-{{ $i }}.{{ $headlessService }}:{{ $controllerPort }}{{- end }}
+    ########################## Network listeners
+    listeners=PLAINTEXT://0.0.0.0:{{ $brokerPort }},CONTROLLER://0.0.0.0:{{ $controllerPort }},EXTERNAL://0.0.0.0:{{ $externalPort }}
+    listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+    
+    # Advertised listeners - CONTROLLER needed for KRaft mode
+    advertised.listeners=PLAINTEXT://${POD_NAME}.{{ $headlessService }}:{{ $brokerPort }},CONTROLLER://${POD_NAME}.{{ $headlessService }}:{{ $controllerPort }},EXTERNAL://${NODE_IP}:{{ $nodePort }}
+    
+    controller.listener.names=CONTROLLER
+    inter.broker.listener.name=PLAINTEXT
+
+    ########################## Storage
+    log.dirs=/var/lib/kafka/data
+
+    ########################## Replication (using your values)
+    default.replication.factor={{ .Values.replication.factor }}
+    min.insync.replicas={{ .Values.replication.minInSyncReplicas }}
+    offsets.topic.replication.factor={{ .Values.replication.factor }}
+    transaction.state.log.replication.factor={{ .Values.replication.factor }}
+    transaction.state.log.min.isr={{ .Values.replication.minInSyncReplicas }}
+
+    ########################## Other settings
+    group.initial.rebalance.delay.ms=0
+    auto.create.topics.enable=true
+    
+    ########################## Log settings
+    log.retention.hours=168
+    log.segment.bytes=1073741824
+    log.retention.check.interval.ms=300000
+    
+    ########################## Cluster settings
+    cluster.id={{ .Values.clusterId }}
+

@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "kafka-kraft.fullname" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "kafka-kraft.labels" . | nindent 4 }}
+    version: "{{ .Chart.AppVersion }}"
+spec:
+  serviceName: {{ include "kafka-kraft.fullname" . }}-headless
+  podManagementPolicy: {{ .Values.podManagementPolicy }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.labels.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.labels.app }}
+        version: "{{ .Chart.AppVersion }}"
+    spec:
+      {{- if .Values.affinity.podAntiAffinity.required }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: [{{ .Values.labels.app | quote }}]
+              topologyKey: "kubernetes.io/hostname"
+      {{- else }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [{{ .Values.labels.app | quote }}]
+                topologyKey: "kubernetes.io/hostname"
+      {{- end }}
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      containers:
+        - name: kafka
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.ports.broker }}
+              name: broker
+              protocol: TCP
+            - containerPort: {{ .Values.ports.controller }}
+              name: controller
+              protocol: TCP
+            - containerPort: {{ .Values.ports.external }}
+              name: external
+              protocol: TCP
+          env:
+            - name: CLUSTER_ID
+              value: "{{ .Values.clusterId }}"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+            - name: kafka-config
+              mountPath: /opt/kafka/config/kraft
+              readOnly: true
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              export NODE_ID=${POD_NAME##*-}
+              echo "Starting Kafka node ${NODE_ID} (pod: ${POD_NAME}) with cluster ID ${CLUSTER_ID}"
+              cp /opt/kafka/config/kraft/server.properties /tmp/server.properties
+              sed -i "s/\${NODE_ID}/${NODE_ID}/g" /tmp/server.properties
+              sed -i "s/\${POD_NAME}/${POD_NAME}/g" /tmp/server.properties
+              sed -i "s/\${NODE_IP}/${NODE_IP}/g" /tmp/server.properties
+              echo "Generated configuration:"
+              grep -E "(node.id|advertised.listeners)" /tmp/server.properties || true
+              if [ ! -f /var/lib/kafka/data/meta.properties ]; then
+                echo "Formatting storage for KRaft mode..."
+                /opt/kafka/bin/kafka-storage.sh format -t ${CLUSTER_ID} -c /tmp/server.properties --ignore-formatted
+              else
+                echo "Storage already formatted."
+              fi
+              echo "Starting Kafka server..."
+              exec /opt/kafka/bin/kafka-server-start.sh /tmp/server.properties
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.probes.readiness.tcpSocketPort }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.probes.liveness.tcpSocketPort }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+      volumes:
+        - name: kafka-config
+          configMap:
+            name: {{ include "kafka-kraft.fullname" . }}-config
+  volumeClaimTemplates:
+    - metadata:
+        name: kafka-data
+        labels:
+          app: {{ .Values.labels.app }}
+      spec:
+        accessModes: {{ toYaml .Values.persistence.accessModes | nindent 10 }}
+        storageClassName: {{ .Values.persistence.storageClassName | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+
